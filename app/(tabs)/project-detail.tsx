@@ -9,6 +9,7 @@ import { formatDuration } from "@/lib/utils";
 import { ScriptEditor } from "@/components/script-editor";
 import { SceneGenerator } from "@/components/scene-generator";
 import { TimelineScreen } from "@/components/timeline-screen";
+import { segmentScriptIntoScenes } from "@/lib/video-utils";
 
 export default function ProjectDetailScreen() {
   const { projectId } = useLocalSearchParams<{ projectId: string }>();
@@ -30,7 +31,18 @@ export default function ProjectDetailScreen() {
   }
 
   const handleUpdateScript = (newScript: string) => {
-    updateProject({ ...project, script: newScript });
+    const updatedProject = { ...project, script: newScript };
+    
+    // Auto-segment script into scenes if there are no scenes yet
+    if (newScript.trim() && project.scenes.length === 0) {
+      const newScenes = segmentScriptIntoScenes(newScript, project.targetDuration);
+      updatedProject.scenes = newScenes.map(scene => ({
+        ...scene,
+        projectId: project.id,
+      }));
+    }
+    
+    updateProject(updatedProject);
     setShowScriptEditor(false);
   };
 

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, FlatList } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Project, Scene } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
 import { DraggableTimelineClip } from "./draggable-timeline-clip";
+import { generateMockVideo, validateScenesForExport } from "@/lib/video-utils";
 
 interface TimelineScreenProps {
   project: Project;
@@ -17,6 +18,7 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [reorderedScenes, setReorderedScenes] = useState<Scene[]>(project.scenes);
+  const [isExporting, setIsExporting] = useState(false);
 
   const totalDuration = reorderedScenes.reduce((sum, scene) => sum + scene.duration, 0);
   const remainingTime = project.targetDuration - totalDuration;
@@ -62,7 +64,7 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
     onUpdateProject({ ...project, scenes: newScenes });
   };
 
-  const handleExportVideo = () => {
+  const handleExportVideo = async () => {
     if (reorderedScenes.length === 0) {
       Alert.alert("Error", "Add scenes to your timeline before exporting");
       return;
@@ -71,7 +73,29 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
       Alert.alert("Warning", "Your video exceeds the 1-minute limit. Please trim some scenes.");
       return;
     }
-    Alert.alert("Export", "Video export feature coming soon!");
+
+    const validation = validateScenesForExport(reorderedScenes);
+    if (!validation.isValid) {
+      Alert.alert("Validation Error", validation.errors.join("\n"));
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const result = await generateMockVideo(reorderedScenes, project.name);
+      if (result.success) {
+        Alert.alert(
+          "Success!",
+          `Video generated successfully!\n\nDuration: ${Math.floor(totalDuration)}s\nClips: ${reorderedScenes.length}\n\nIn production, this would be saved to your camera roll.`,
+          [{ text: "Done" }]
+        );
+      }
+    } catch (error) {
+      Alert.alert("Export Failed", "There was an error exporting your video. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -213,45 +237,49 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
       <View style={{ flexDirection: "row", gap: 8 }}>
         <TouchableOpacity
           onPress={() => setIsPreviewMode(!isPreviewMode)}
+          disabled={isExporting}
           style={{
             flex: 1,
             paddingVertical: 12,
             borderRadius: 8,
             borderWidth: 1,
-            borderColor: colors.primary,
+            borderColor: isExporting ? colors.muted : colors.primary,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
             gap: 6,
+            opacity: isExporting ? 0.5 : 1,
           }}
         >
-          <Ionicons name="play-circle-outline" size={18} color={colors.primary} />
-          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+          <Ionicons name="play-circle-outline" size={18} color={isExporting ? colors.muted : colors.primary} />
+          <Text style={{ fontSize: 14, fontWeight: "600", color: isExporting ? colors.muted : colors.primary }}>
             Preview
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleExportVideo}
-          disabled={reorderedScenes.length === 0}
+          disabled={reorderedScenes.length === 0 || isExporting}
           style={{
             flex: 1,
             paddingVertical: 12,
             borderRadius: 8,
-            backgroundColor: reorderedScenes.length === 0 ? colors.muted : colors.primary,
+            backgroundColor: reorderedScenes.length === 0 || isExporting ? colors.muted : colors.primary,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
             gap: 6,
           }}
         >
-          <Ionicons
-            name="download-outline"
-            size={18}
-            color={colors.background}
-          />
-          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.background }}>
-            Export
-          </Text>
+          {isExporting ? (
+            <ActivityIndicator color={colors.background} size="small" />
+          ) : (
+            <>
+              <Ionicons name="download-outline" size={18} color={colors.background} />
+              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.background }}>
+                Export
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>
