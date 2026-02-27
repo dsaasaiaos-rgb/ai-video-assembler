@@ -4,7 +4,7 @@ import { useColors } from "@/hooks/use-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Project, Scene } from "@/lib/types";
 import { formatDuration } from "@/lib/utils";
-import { TimelineClip } from "./timeline-clip";
+import { DraggableTimelineClip } from "./draggable-timeline-clip";
 
 interface TimelineScreenProps {
   project: Project;
@@ -15,8 +15,10 @@ interface TimelineScreenProps {
 export function TimelineScreen({ project, onUpdateProject, onEditScene }: TimelineScreenProps) {
   const colors = useColors();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [reorderedScenes, setReorderedScenes] = useState<Scene[]>(project.scenes);
 
-  const totalDuration = project.scenes.reduce((sum, scene) => sum + scene.duration, 0);
+  const totalDuration = reorderedScenes.reduce((sum, scene) => sum + scene.duration, 0);
   const remainingTime = project.targetDuration - totalDuration;
   const isComplete = remainingTime === 0;
   const isOvertime = remainingTime < 0;
@@ -27,7 +29,8 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
       {
         text: "Delete",
         onPress: () => {
-          const updatedScenes = project.scenes.filter((s) => s.id !== sceneId);
+          const updatedScenes = reorderedScenes.filter((s) => s.id !== sceneId);
+          setReorderedScenes(updatedScenes);
           onUpdateProject({ ...project, scenes: updatedScenes });
         },
         style: "destructive",
@@ -35,8 +38,32 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
     ]);
   };
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const handleMoveSceneUp = (index: number) => {
+    if (index === 0) return;
+    const newScenes = [...reorderedScenes];
+    [newScenes[index], newScenes[index - 1]] = [newScenes[index - 1], newScenes[index]];
+    setReorderedScenes(newScenes);
+    onUpdateProject({ ...project, scenes: newScenes });
+  };
+
+  const handleMoveSceneDown = (index: number) => {
+    if (index === reorderedScenes.length - 1) return;
+    const newScenes = [...reorderedScenes];
+    [newScenes[index], newScenes[index + 1]] = [newScenes[index + 1], newScenes[index]];
+    setReorderedScenes(newScenes);
+    onUpdateProject({ ...project, scenes: newScenes });
+  };
+
   const handleExportVideo = () => {
-    if (project.scenes.length === 0) {
+    if (reorderedScenes.length === 0) {
       Alert.alert("Error", "Add scenes to your timeline before exporting");
       return;
     }
@@ -98,13 +125,13 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
                 : `${formatDuration(remainingTime)} remaining`}
           </Text>
           <Text style={{ fontSize: 11, color: colors.muted }}>
-            {project.scenes.length} clip{project.scenes.length !== 1 ? "s" : ""}
+            {reorderedScenes.length} clip{reorderedScenes.length !== 1 ? "s" : ""}
           </Text>
         </View>
       </View>
 
       {/* Timeline Clips */}
-      {project.scenes.length === 0 ? (
+      {reorderedScenes.length === 0 ? (
         <View
           style={{
             flex: 1,
@@ -122,20 +149,64 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={project.scenes}
-          renderItem={({ item, index }) => (
-            <TimelineClip
-              scene={item}
-              index={index}
-              onEdit={onEditScene}
-              onDelete={handleDeleteScene}
-            />
-          )}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={{ marginBottom: 12 }}
-        />
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginBottom: 12 }}>
+          {reorderedScenes.map((scene, index) => (
+            <View key={scene.id} style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              {/* Reorder Controls */}
+              <View style={{ justifyContent: "center", gap: 4 }}>
+                <TouchableOpacity
+                  onPress={() => handleMoveSceneUp(index)}
+                  disabled={index === 0}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    backgroundColor: index === 0 ? colors.border : colors.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-up"
+                    size={18}
+                    color={index === 0 ? colors.muted : colors.background}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleMoveSceneDown(index)}
+                  disabled={index === reorderedScenes.length - 1}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    backgroundColor: index === reorderedScenes.length - 1 ? colors.border : colors.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-down"
+                    size={18}
+                    color={index === reorderedScenes.length - 1 ? colors.muted : colors.background}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Draggable Clip */}
+              <View style={{ flex: 1 }}>
+                <DraggableTimelineClip
+                  scene={scene}
+                  index={index}
+                  isDragging={draggedIndex === index}
+                  onEdit={onEditScene}
+                  onDelete={handleDeleteScene}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
       )}
 
       {/* Action Buttons */}
@@ -161,12 +232,12 @@ export function TimelineScreen({ project, onUpdateProject, onEditScene }: Timeli
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleExportVideo}
-          disabled={project.scenes.length === 0}
+          disabled={reorderedScenes.length === 0}
           style={{
             flex: 1,
             paddingVertical: 12,
             borderRadius: 8,
-            backgroundColor: project.scenes.length === 0 ? colors.muted : colors.primary,
+            backgroundColor: reorderedScenes.length === 0 ? colors.muted : colors.primary,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",

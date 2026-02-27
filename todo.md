@@ -40,3 +40,9 @@
 - [x] Error handling and user feedback
 - [ ] Performance optimization
 - [ ] End-to-end testing of video creation flow
+
+
+## Current Work - Phase 6
+- [x] Implement drag-and-drop scene reordering on timeline
+- [x] Add visual feedback during drag operations
+- [x] Update scene order in project state
