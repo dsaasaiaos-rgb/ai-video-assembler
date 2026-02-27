@@ -32,7 +32,7 @@ const env = {
   appSlug: "ai-video-assembler",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/V8Dfk24on73d0X3gKg5b4Z/sandbox/HjMk5sLahtzWvz4aRZDEzl-img-1_1772154532000_na1fn_aWNvbg.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
