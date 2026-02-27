@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert, TextInput } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert, TextInput, Modal } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useProjects } from "@/lib/project-context";
 import { formatDate, formatDuration } from "@/lib/utils";
